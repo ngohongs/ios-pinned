@@ -6,17 +6,61 @@
 //
 
 import UIKit
+import Firebase
+import FirebaseAuth
+import GoogleSignIn
 
-class SceneDelegate: UIResponder, UIWindowSceneDelegate {
+class SceneDelegate: UIResponder, UIWindowSceneDelegate, GIDSignInDelegate {
+    
 
     var window: UIWindow?
 
-
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
-        // Use this method to optionally configure and attach the UIWindow `window` to the provided UIWindowScene `scene`.
-        // If using a storyboard, the `window` property will automatically be initialized and attached to the scene.
-        // This delegate does not imply the connecting scene or session are new (see `application:configurationForConnectingSceneSession` instead).
-        guard let _ = (scene as? UIWindowScene) else { return }
+            let storyboard =  UIStoryboard(name: "Main", bundle: nil)
+            if let windowScene = scene as? UIWindowScene {
+                self.window = UIWindow(windowScene: windowScene)
+                if Auth.auth().currentUser != nil {
+                    self.window!.rootViewController = storyboard.instantiateViewController(identifier: "tabBarController")
+                    self.window!.makeKeyAndVisible()
+                } else {
+                    self.window!.rootViewController = storyboard.instantiateViewController(withIdentifier: "LoginViewController")
+                    self.window!.makeKeyAndVisible()
+                }
+            }
+            GIDSignIn.sharedInstance().clientID = FirebaseApp.app()?.options.clientID
+            GIDSignIn.sharedInstance().delegate = self
+        }
+    
+    // handle the sign in to redirect to the home controller
+    func sign(_ signIn: GIDSignIn!, didSignInFor user: GIDGoogleUser!, withError error: Error?) {
+        if error != nil {
+            return
+        }
+
+        guard let authentication = user.authentication else { return }
+        let credential = GoogleAuthProvider.credential(withIDToken: authentication.idToken, accessToken: authentication.accessToken)
+        Auth.auth().signIn(with: credential) { (authResult, error) in
+            if let error = error {
+                print(error.localizedDescription)
+                return
+            }
+            let storyboard = UIStoryboard(name: "Main", bundle: nil)
+            let tabBarController = storyboard.instantiateViewController(identifier: "tabBarController")
+            
+            UIView.transition(with: self.window!, duration: 0.8, options: .transitionCurlUp, animations: {
+                        let oldState = UIView.areAnimationsEnabled
+                        UIView.setAnimationsEnabled(false)
+                        self.window!.rootViewController = tabBarController
+                        UIView.setAnimationsEnabled(oldState)
+                
+            }, completion: nil)
+        }
+    }
+
+    func sign(_ signIn: GIDSignIn!, didDisconnectWith user: GIDGoogleUser!, withError error: Error!) {
+        // Perform any operations when the user disconnects from app here.
+        // ...
+
     }
 
     func sceneDidDisconnect(_ scene: UIScene) {
